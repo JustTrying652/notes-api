@@ -5,20 +5,32 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 
 notes_bp = Blueprint("notes", __name__)
 
+
 @notes_bp.route("/", methods=["GET"])
 @jwt_required()
 def get_notes():
     user_id = get_jwt_identity()
-    notes = Note.query.filter_by(user_id=user_id).all()
+    
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 5, type=int)
+    
+    pagination = Note.query.filter_by(user_id=user_id).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
 
-    return jsonify([{
-        "id": note.id,
-        "title": note.title,
-        "content": note.content,
-        "created_at": note.created_at.isoformat(),
-        "updated_at": note.updated_at.isoformat()
-    } for note in notes]), 200
-
+    return jsonify({
+        "notes": [{
+            "id": note.id,
+            "title": note.title,
+            "content": note.content,
+            "created_at": note.created_at.isoformat(),
+            "updated_at": note.updated_at.isoformat()
+        } for note in pagination.items],
+        "total": pagination.total,
+        "pages": pagination.pages,
+        "current_page": pagination.page,
+        "per_page": pagination.per_page
+    }), 200
 
 @notes_bp.route("/", methods=["POST"])
 @jwt_required()
@@ -38,24 +50,40 @@ def create_note():
 
     return jsonify({"message": "Note created", "id": note.id}), 201
 
-
-@notes_bp.route("/<int:note_id>", methods=["GET"])
+@notes_bp.route("/", methods=["GET"])
 @jwt_required()
-def get_note(note_id):
+def get_notes():
     user_id = get_jwt_identity()
-    note = Note.query.filter_by(id=note_id, user_id=user_id).first()
-
-    if not note:
-        return jsonify({"error": "Note not found"}), 404
+    
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 5, type=int)
+    search = request.args.get("search", "", type=str)
+    
+    query = Note.query.filter_by(user_id=user_id)
+    
+    if search:
+        query = query.filter(
+            Note.title.ilike(f"%{search}%") | 
+            Note.content.ilike(f"%{search}%")
+        )
+    
+    pagination = query.paginate(
+        page=page, per_page=per_page, error_out=False
+    )
 
     return jsonify({
-        "id": note.id,
-        "title": note.title,
-        "content": note.content,
-        "created_at": note.created_at.isoformat(),
-        "updated_at": note.updated_at.isoformat()
+        "notes": [{
+            "id": note.id,
+            "title": note.title,
+            "content": note.content,
+            "created_at": note.created_at.isoformat(),
+            "updated_at": note.updated_at.isoformat()
+        } for note in pagination.items],
+        "total": pagination.total,
+        "pages": pagination.pages,
+        "current_page": pagination.page,
+        "per_page": pagination.per_page
     }), 200
-
 
 @notes_bp.route("/<int:note_id>", methods=["PUT"])
 @jwt_required()
