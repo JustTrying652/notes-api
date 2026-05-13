@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
+from flask_cors import CORS
 from app.config import Config
 
 db = SQLAlchemy()
@@ -12,6 +13,7 @@ def create_app():
 
     db.init_app(app)
     jwt.init_app(app)
+    CORS(app)
 
     from app.routes.auth import auth_bp
     from app.routes.notes import notes_bp
